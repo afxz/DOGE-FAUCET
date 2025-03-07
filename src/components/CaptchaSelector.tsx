@@ -10,8 +10,9 @@ interface CaptchaSelectorProps {
 declare global {
   interface Window {
     turnstile: {
-      render: (container: string | HTMLElement, options: any) => void;
+      render: (container: string | HTMLElement, options: any) => string;
       reset: (widgetId: string) => void;
+      remove: (widgetId: string) => void;
     };
   }
 }
@@ -22,29 +23,45 @@ export const CaptchaSelector: React.FC<CaptchaSelectorProps> = ({ onVerify }) =>
 
   const initTurnstile = useCallback(() => {
     if (window.turnstile && captchaType === 'turnstile') {
+      const container = document.getElementById('turnstile-container');
+      if (!container) return;
+
       if (turnstileWidget) {
-        window.turnstile.reset(turnstileWidget);
+        try {
+          window.turnstile.reset(turnstileWidget);
+        } catch (e) {
+          console.error('Failed to reset Turnstile widget:', e);
+        }
       } else {
-        window.turnstile.render('#turnstile-container', {
-          sitekey: config.captcha.turnstile.siteKey,
-          callback: onVerify,
-          theme: 'light'
-        });
+        try {
+          const widgetId = window.turnstile.render(container, {
+            sitekey: config.captcha.turnstile.siteKey,
+            callback: onVerify,
+            theme: 'light',
+            'refresh-expired': 'auto'
+          });
+          setTurnstileWidget(widgetId);
+        } catch (e) {
+          console.error('Failed to render Turnstile widget:', e);
+        }
       }
     }
   }, [captchaType, onVerify, turnstileWidget]);
 
   useEffect(() => {
     const script = document.createElement('script');
-    script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js';
+    script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?onload=onTurnstileLoad';
     script.async = true;
     script.defer = true;
+    
+    // Define the onload callback
+    window.onTurnstileLoad = initTurnstile;
+    
     document.head.appendChild(script);
-
-    script.onload = initTurnstile;
 
     return () => {
       document.head.removeChild(script);
+      delete window.onTurnstileLoad;
     };
   }, [initTurnstile]);
 
@@ -53,6 +70,19 @@ export const CaptchaSelector: React.FC<CaptchaSelectorProps> = ({ onVerify }) =>
       initTurnstile();
     }
   }, [captchaType, initTurnstile]);
+
+  // Cleanup Turnstile widget when component unmounts
+  useEffect(() => {
+    return () => {
+      if (turnstileWidget && window.turnstile) {
+        try {
+          window.turnstile.remove(turnstileWidget);
+        } catch (e) {
+          console.error('Failed to remove Turnstile widget:', e);
+        }
+      }
+    };
+  }, [turnstileWidget]);
 
   return (
     <div className="space-y-4">
@@ -90,7 +120,7 @@ export const CaptchaSelector: React.FC<CaptchaSelectorProps> = ({ onVerify }) =>
             size="normal"
           />
         ) : (
-          <div id="turnstile-container"></div>
+          <div id="turnstile-container" className="min-h-[65px]"></div>
         )}
       </div>
     </div>
