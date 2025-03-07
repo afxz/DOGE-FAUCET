@@ -7,15 +7,6 @@ export const config = {
     timerMinutes: 60,
     maxClaimsPerDay: 5,
   },
-  captcha: {
-    hcaptcha: {
-      siteKey: '9580eb5e-fb9a-4f0a-9718-e2123f085104',
-    },
-    turnstile: {
-      siteKey: '0x4AAAAAAA_1inUlVfg9muEt',
-      domain: 'https://earn.webmasters.us.kg/'
-    }
-  },
   ads: {
     header: `<div id="frame" style="width: 100%;"><iframe data-aa='2384671' src='//acceptable.a-ads.com/2384671' style='border:0px; padding:0; width:100%; height:100%; overflow:hidden; background-color: transparent;'></iframe><a style="display: block; text-align: right; font-size: 12px" id="frame-link" href="https://aads.com/campaigns/new/?source_id=2384671&source_type=ad_unit&partner=2384671">Advertise here</a></div>`,
     sidebarTop: `<div id="frame" style="width: 100%;"><iframe data-aa='2384671' src='//acceptable.a-ads.com/2384671' style='border:0px; padding:0; width:100%; height:100%; overflow:hidden; background-color: transparent;'></iframe><a style="display: block; text-align: right; font-size: 12px" id="frame-link" href="https://aads.com/campaigns/new/?source_id=2384671&source_type=ad_unit&partner=2384671">Advertise here</a></div>`,

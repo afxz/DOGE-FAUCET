@@ -1,202 +1,78 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { config } from '../config/settings';
-import HCaptcha from '@hcaptcha/react-hcaptcha';
-import { ShieldCheck } from 'lucide-react';
+import React, { useState, useCallback } from 'react';
+import { Calculator } from 'lucide-react';
 
 interface CaptchaSelectorProps {
   onVerify: (token: string) => void;
 }
 
-declare global {
-  interface Window {
-    turnstile: {
-      render: (container: string | HTMLElement, options: any) => string;
-      reset: (widgetId: string) => void;
-      remove: (widgetId: string) => void;
-    };
-    onTurnstileLoad?: () => void;
-  }
-}
-
 export const CaptchaSelector: React.FC<CaptchaSelectorProps> = ({ onVerify }) => {
-  const [captchaType, setCaptchaType] = useState<'hcaptcha' | 'turnstile'>('hcaptcha');
-  const [turnstileWidget, setTurnstileWidget] = useState<string | null>(null);
+  const [mathProblem, setMathProblem] = useState(() => ({
+    a: Math.ceil(Math.random() * 10),
+    b: Math.ceil(Math.random() * 10)
+  }));
+  const [mathAnswer, setMathAnswer] = useState('');
   const [isVerified, setIsVerified] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const turnstileInitialized = useRef(false);
-  const scriptLoaded = useRef(false);
-
-  const handleTurnstileVerify = useCallback((token: string) => {
-    setIsVerified(true);
-    onVerify(token);
-  }, [onVerify]);
-
-  const initTurnstile = useCallback(() => {
-    if (!window.turnstile || captchaType !== 'turnstile' || turnstileInitialized.current) return;
-
-    const container = document.getElementById('turnstile-container');
-    if (!container) return;
-
-    try {
-      // Clean up existing widget if any
-      if (turnstileWidget && window.turnstile) {
-        try {
-          window.turnstile.remove(turnstileWidget);
-        } catch (e) {
-          console.error('Failed to remove existing widget:', e);
-        }
-      }
-
-      // Create new widget
-      const widgetId = window.turnstile.render(container, {
-        sitekey: config.captcha.turnstile.siteKey,
-        callback: handleTurnstileVerify,
-        theme: 'light',
-        'refresh-expired': 'manual',
-        'error-callback': () => {
-          console.error('Turnstile encountered an error');
-          setIsLoading(false);
-        },
-        'timeout-callback': () => {
-          console.error('Turnstile timed out');
-          setIsLoading(false);
-        }
-      });
-
-      setTurnstileWidget(widgetId);
-      turnstileInitialized.current = true;
-      setIsLoading(false);
-    } catch (e) {
-      console.error('Failed to initialize Turnstile:', e);
-      setIsLoading(false);
-    }
-  }, [captchaType, turnstileWidget, handleTurnstileVerify]);
-
-  useEffect(() => {
-    if (captchaType === 'turnstile' && !scriptLoaded.current) {
-      setIsLoading(true);
-
-      const existingScript = document.querySelector('script[src*="turnstile"]');
-      if (existingScript) {
-        scriptLoaded.current = true;
-        initTurnstile();
-        return;
-      }
-
-      const script = document.createElement('script');
-      script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js';
-      script.async = true;
-      script.defer = true;
-      
-      script.onload = () => {
-        scriptLoaded.current = true;
-        // Small delay to ensure Turnstile is fully initialized
-        setTimeout(() => {
-          initTurnstile();
-        }, 100);
-      };
-
-      script.onerror = (error) => {
-        console.error('Failed to load Turnstile script:', error);
-        setIsLoading(false);
-      };
-
-      document.head.appendChild(script);
-
-      return () => {
-        if (script.parentNode) {
-          script.parentNode.removeChild(script);
-        }
-        scriptLoaded.current = false;
-      };
-    }
-  }, [captchaType, initTurnstile]);
-
-  // Reset states when switching captcha type
-  useEffect(() => {
+  
+  const generateMathProblem = useCallback(() => {
+    const a = Math.ceil(Math.random() * 10);
+    const b = Math.ceil(Math.random() * 10);
+    setMathProblem({ a, b });
+    setMathAnswer('');
     setIsVerified(false);
-    turnstileInitialized.current = false;
-    if (turnstileWidget && window.turnstile) {
-      try {
-        window.turnstile.remove(turnstileWidget);
-      } catch (e) {
-        console.error('Failed to remove widget during type switch:', e);
-      }
+  }, []);
+
+  const handleMathVerify = () => {
+    const isCorrect = parseInt(mathAnswer) === (mathProblem.a + mathProblem.b);
+    if (isCorrect) {
+      setIsVerified(true);
+      const token = `math_${Date.now()}_${mathProblem.a}_${mathProblem.b}`;
+      onVerify(token);
+    } else {
+      setIsVerified(false);
+      generateMathProblem();
+      setMathAnswer('');
     }
-  }, [captchaType, turnstileWidget]);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (turnstileWidget && window.turnstile) {
-        try {
-          window.turnstile.remove(turnstileWidget);
-        } catch (e) {
-          console.error('Failed to cleanup widget on unmount:', e);
-        }
-      }
-    };
-  }, [turnstileWidget]);
-
-  const handleCaptchaTypeChange = (type: 'hcaptcha' | 'turnstile') => {
-    setCaptchaType(type);
-    setIsVerified(false);
-    setIsLoading(false);
-    turnstileInitialized.current = false;
   };
 
   return (
     <div className="space-y-4">
-      <div className="flex gap-4 justify-center">
-        <button
-          onClick={() => handleCaptchaTypeChange('hcaptcha')}
-          className={`px-4 py-2 rounded transition-colors flex items-center gap-2 ${
-            captchaType === 'hcaptcha' 
-              ? 'bg-yellow-500 text-white' 
-              : 'bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600'
-          }`}
-          disabled={isLoading}
-        >
-          <ShieldCheck className="w-4 h-4" />
-          hCaptcha
-        </button>
-        <button
-          onClick={() => handleCaptchaTypeChange('turnstile')}
-          className={`px-4 py-2 rounded transition-colors flex items-center gap-2 ${
-            captchaType === 'turnstile' 
-              ? 'bg-yellow-500 text-white' 
-              : 'bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600'
-          }`}
-          disabled={isLoading}
-        >
-          <ShieldCheck className="w-4 h-4" />
-          Turnstile
-        </button>
-      </div>
-
       <div className="flex justify-center">
-        {captchaType === 'hcaptcha' ? (
-          <HCaptcha
-            sitekey={config.captcha.hcaptcha.siteKey}
-            onVerify={(token) => {
-              setIsVerified(true);
-              onVerify(token);
-            }}
-            theme="light"
-            size="normal"
-          />
-        ) : (
-          <div 
-            id="turnstile-container" 
-            className={`min-h-[65px] ${isVerified ? 'opacity-50' : ''}`}
-          >
-            {isLoading && (
-              <div className="flex items-center justify-center h-[65px]">
-                <div className="animate-spin rounded-full h-6 w-6 border-2 border-yellow-500 border-t-transparent"></div>
-              </div>
-            )}
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md border border-gray-200 dark:border-gray-700">
+          <div className="flex items-center justify-center mb-4 text-yellow-500">
+            <Calculator className="w-6 h-6" />
           </div>
-        )}
+          <div className="text-center mb-4">
+            <span className="text-xl font-medium text-gray-900 dark:text-gray-100">
+              What is {mathProblem.a} + {mathProblem.b}?
+            </span>
+          </div>
+          <div className="flex gap-3">
+            <input
+              type="number"
+              value={mathAnswer}
+              onChange={(e) => setMathAnswer(e.target.value)}
+              className="w-24 px-3 py-2 text-lg border rounded-md 
+                       focus:outline-none focus:ring-2 focus:ring-yellow-500 
+                       bg-gray-50 dark:bg-gray-700 
+                       text-gray-900 dark:text-gray-100
+                       border-gray-300 dark:border-gray-600
+                       placeholder-gray-400 dark:placeholder-gray-500"
+              placeholder="Answer"
+              disabled={isVerified}
+            />
+            <button
+              onClick={handleMathVerify}
+              disabled={!mathAnswer || isVerified}
+              className="px-4 py-2 bg-yellow-500 text-white rounded-md 
+                       hover:bg-yellow-600 
+                       disabled:opacity-50 disabled:cursor-not-allowed
+                       transition-colors duration-200
+                       font-medium"
+            >
+              Verify
+            </button>
+          </div>
+        </div>
       </div>
 
       {isVerified && (

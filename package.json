@@ -10,7 +10,6 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@hcaptcha/react-hcaptcha": "^1.9.3",
     "framer-motion": "^10.18.0",
     "lucide-react": "^0.344.0",
     "react": "^18.2.0",
